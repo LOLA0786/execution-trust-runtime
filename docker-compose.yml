@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - WORLD_STATE_INTEGRITY_ENABLED=true
+      - WORLD_STATE_REPLAY_ENABLED=true
+    volumes:
+      - .:/app

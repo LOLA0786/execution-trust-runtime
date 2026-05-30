@@ -1,0 +1,22 @@
+[project]
+name = "execution-trust-runtime"
+version = "0.1.0"
+description = "Runtime verification for autonomous enterprise agents with PrivateVault"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "redis",
+    "celery",
+    "langgraph",
+    "llama-index",
+    "neo4j",
+    "sqlalchemy",
+]
+
+[tool.setuptools]
+packages = ["execution_trust_runtime"]
+
+[project.scripts]
+run = "main:main"
