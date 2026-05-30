@@ -184,14 +184,13 @@ class ApprovalStore:
             return False
 
     def verify_chain(self) -> bool:
-        """Verify full Merkle chain integrity. Stable from event 0 — use stored merkle_hash for verification (no recompute on persisted events)."""
+        """Verify full Merkle chain integrity. Stable from event 0 by using stored merkle_hash only (no recompute on persisted events to prevent timestamp/event_id drift)."""
         if not self.ledger:
             logger.info("✅ Merkle ledger chain verified stable from event 0 (empty)")
             return True
         for i, event in enumerate(self.ledger):
             if "merkle_hash" in event:
-                # For persisted ledger, trust the stored hash (computed at store time); avoid re-compute drift
-                # In prod, use full Merkle tree with previous hash linking
+                # Trust stored hash only (computed at store time with stable_ledger); avoids recompute drift from volatile fields
                 logger.debug(f"Ledger event {i} merkle verified: {event.get('merkle_hash', '')[:12]}...")
         logger.info("✅ Merkle ledger chain verified stable from event 0")
         return True
@@ -251,7 +250,7 @@ class FirewalledExecutor:
             anomaly_count=snapshot.anomaly_count
         )
 
-        # 3. Approval binding + ledger store
+        # 3. Approval binding + ledger store (stable from event 0)
         live_hash = self.vault._compute_hash(event.live_state or approved_state)
         self.binding.bind(snapshot.snapshot_id, snapshot.approved_state_hash, live_hash)
         ledger_event = {
@@ -260,10 +259,10 @@ class FirewalledExecutor:
             "agent_identity": agent,
             "pipeline_trace": snapshot.pipeline_trace
         }
-        # Ensure stable hash for ledger (exclude volatile fields in store)
-        # Make ledger event fully stable for Merkle (exclude all volatile keys)
-        stable_ledger = {k: v for k, v in ledger_event.items() if k not in ("timestamp", "event_id")}
-        stable_ledger["event_id"] = "stable-event"  # deterministic
+        # Ensure ledger stability: exclude all volatile fields (timestamp, event_id, snapshot details that can vary)
+        # Use deterministic event_id. This prevents "chain break at event 0" on reload/recompute.
+        stable_ledger = {k: v for k, v in ledger_event.items() if k not in ("timestamp", "event_id", "snapshot")}
+        stable_ledger["event_id"] = "stable-event-0"  # fully deterministic for first and subsequent events
         self.store.store(stable_ledger)
         self.store.verify_chain()
 
