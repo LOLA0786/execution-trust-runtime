@@ -1,10 +1,33 @@
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+
   app:
     build: .
     ports:
       - "8000:8000"
     environment:
+      - REDIS_URL=redis://redis:6379/0
       - WORLD_STATE_INTEGRITY_ENABLED=true
       - WORLD_STATE_REPLAY_ENABLED=true
     volumes:
       - .:/app
+    depends_on:
+      - redis
+
+  # Optional Neo4j for knowledge graph (knowledge_graph/ dir)
+  # neo4j:
+  #   image: neo4j:5-community
+  #   ports:
+  #     - "7474:7474"
+  #     - "7687:7687"
+  #   environment:
+  #     - NEO4J_AUTH=neo4j/password
+  #   volumes:
+  #     - neo4j_data:/data
+
+# volumes:
+#   neo4j_data:

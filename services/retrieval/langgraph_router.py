@@ -71,11 +71,13 @@ class LangGraphRouter:
         return "execute"
     
     def _execute_with_vault_check(self, state: RetrievalState) -> RetrievalState:
-        """All tool execution gated by PrivateVault."""
+        """All tool execution gated by PrivateVault (robust against dict snapshot)."""
         last_msg = state.get("messages", [{}])[-1]
         query_content = last_msg.get("content", "unknown") if isinstance(last_msg, dict) else str(last_msg)
         action = {"type": "retrieval", "query": query_content}
-        check = vault.validate_before_execution({"id": "retrieval-snapshot"}, action)
+        # Use dict snapshot for compatibility with orchestrator calls
+        snapshot_dict = {"agent": "retrieval_router", "task": query_content, "intent_drift_score": 0.0}
+        check = vault.validate_before_execution(snapshot_dict, action)
         
         if check.get("verdict") == "BLOCK":
             state["messages"].append({"role": "system", "content": "BLOCKED by PrivateVault: " + check.get("reason", "")})

@@ -162,14 +162,23 @@ class PrivateVault:
 
         return event
 
-    def validate_before_execution(self, snapshot: CognitionSnapshot, action: Dict[str, Any]) -> Dict[str, Any]:
-        """Legacy alias for checkpoint compatibility (pre-execution gate)."""
+    def validate_before_execution(self, snapshot: Any, action: Dict[str, Any]) -> Dict[str, Any]:
+        """Legacy alias for checkpoint compatibility (handles dict or CognitionSnapshot)."""
+        if isinstance(snapshot, dict):
+            agent = snapshot.get("agent", "unknown")
+            task = snapshot.get("task", "validation")
+            drift = snapshot.get("intent_drift_score", 0.0)
+        else:
+            agent = getattr(snapshot, "agent", "unknown")
+            task = getattr(snapshot, "task", "validation")
+            drift = getattr(snapshot, "intent_drift_score", 0.0)
+        
         event = self.checkpoint(
-            agent=snapshot.agent,
-            task=snapshot.task,
+            agent=agent,
+            task=task,
             approved_state=action,
             live_state=action.get("live_state"),
-            intent_drift_score=snapshot.intent_drift_score
+            intent_drift_score=drift
         )
         return {
             "verdict": event.verdict.value,

@@ -43,3 +43,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # Also run the comprehensive demo
+    try:
+        from tests.demo.full_demo import run_full_demo
+        print("\n" + "="*80)
+        run_full_demo()
+    except Exception as e:
+        print(f"Demo run note: {e} (full demo available via python -m tests.demo.full_demo)")
+
