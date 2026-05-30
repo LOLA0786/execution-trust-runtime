@@ -9,6 +9,7 @@ from langgraph.graph import StateGraph, END
 import json
 
 from core.vault.private_vault import vault
+from integrations.firewalled import jira, slack, salesforce  # All tool calls must use proxies
 
 
 class RetrievalState(TypedDict):

@@ -9,6 +9,7 @@ Full pipeline: Inputs (Salesforce/CRM pipeline) → Retrieval → Memory/Reflect
 from typing import Dict, Any
 from core.hermes.orchestrator import hermes
 from core.vault.private_vault import vault, vault_checkpoint, VaultCheckpointError
+from integrations.firewalled import salesforce  # All CRM/discount updates MUST use firewalled proxy
 
 
 class RevenueOpsAgent:
@@ -36,17 +37,21 @@ class RevenueOpsAgent:
     
     @vault_checkpoint(task_name="detect_revenue_anomaly", anomaly_threshold=1)
     def detect_anomaly(self, state: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Graceful anomaly detection. Now uses FirewalledExecutor (firewall + capability scoping for discounts only).
-        On BLOCK: returns graceful dict with replay + trust=0.01 instead of raw exception.
+        """Graceful anomaly detection with strict capability scoping (Revenue Ops: discounts/anomalies only).
+        Uses FirewalledExecutor. All CRM updates (salesforce.update) MUST go through firewalled proxy.
+        On BLOCK: returns graceful dict with replay + trust=0.01.
         """
         if not state:
-            state = {"pipeline": "Q3", "requested_discount": 0.70, "approved_discount": 0.10}
+            state = {"pipeline": "Q3", "requested_discount": 0.70, "approved_discount": 0.10, "action": "discount_anomaly"}
+        # Example firewalled call (would update Salesforce if ALLOW)
+        salesforce.update(opportunity_id="OPP-123", discount=0.10, status="BLOCKED")
         # This only executes on ALLOW; decorator handles BLOCK gracefully for Revenue Ops
         return {
             "recommendation": "BLOCK discount approval (10% approved vs 70% requested). Escalate to CFO.",
             "status": "BLOCKED_BY_VAULT",
             "anomaly_detected": True,
-            "trust_score": 0.85  # only if ALLOW
+            "trust_score": 0.85,  # only if ALLOW
+            "capability": "discounts_only"
         }
 
 

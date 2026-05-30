@@ -9,6 +9,7 @@ Full pipeline: Inputs (Slack/Email/Jira/CRM/Calendar) → Retrieval → Memory/R
 from typing import Dict, Any
 from core.hermes.orchestrator import hermes
 from core.vault.private_vault import vault, vault_checkpoint, VaultCheckpointError
+from integrations.firewalled import slack, email, calendar  # All notifications/packets/meetings MUST use firewalled proxies
 
 
 class ChiefOfStaffAgent:
@@ -33,13 +34,20 @@ class ChiefOfStaffAgent:
     
     @vault_checkpoint(task_name="execute_top_decisions")
     def top_decisions(self, state: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Top decisions action using @vault_checkpoint decorator."""
+        """Top decisions with strict capability scoping (ChiefOfStaff: notifications, packets, meetings only).
+        All side effects (slack.send_message, email.send, calendar.create_event) MUST use firewalled proxies.
+        """
         if not state:
-            state = {"decisions": 5, "risks_identified": 3}
+            state = {"decisions": 5, "risks_identified": 3, "action": "send_notifications"}
+        # Example firewalled calls (enforced by proxies)
+        slack.send_message(channel="#exec", message="Top 5 decisions approved.")
+        email.send(to="cfo@company.com", subject="Revenue Anomaly Alert")
+        calendar.create_event(title="Exec Sync", time="2026-06-01")
         return {
             "recommendation": "Top 5 decisions: 1. Procurement cancel, 2. Revenue BLOCK, 3. Exec sync, 4. Pipeline review, 5. Audit.",
             "risks": ["timing", "alignment", "compliance"],
-            "status": "EXECUTED"
+            "status": "EXECUTED_VIA_FIREWALL",
+            "capability": "notifications_packets_meetings_only"
         }
 
 

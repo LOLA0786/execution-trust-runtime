@@ -9,6 +9,7 @@ Full pipeline: Inputs (contracts/Jira/spend/usage) → Retrieval (LangGraph) →
 from typing import Dict, Any
 from core.hermes.orchestrator import hermes
 from core.vault.private_vault import vault, vault_checkpoint, VaultCheckpointError
+from integrations.firewalled import jira  # All calls must use this firewalled proxy
 
 
 class ProcurementAgent:
@@ -33,13 +34,18 @@ class ProcurementAgent:
     
     @vault_checkpoint(task_name="execute_saas_cancellation")
     def cancel_saas(self, vendor: str = "Datadog", spend: int = 180000, state: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Specialized action using @vault_checkpoint decorator (enforces pre-execution gate)."""
+        """Specialized action with strict capability scoping (Procurement: contracts/cancellations only).
+        All side effects (Jira ticket) MUST use firewalled.jira proxy.
+        """
         if not state:
-            state = {"vendor": vendor, "spend": spend, "usage_pct": 12}
+            state = {"vendor": vendor, "spend": spend, "usage_pct": 12, "action": "cancel_contract"}
+        # Example firewalled call (enforced by proxy)
+        jira.create_issue(summary=f"Cancel {vendor} SaaS", description="Low usage termination packet")
         return {
             "recommendation": f"Cancel {vendor} SaaS subscription (${spend} at {state.get('usage_pct', 12)}% usage).",
             "jira_ticket": "ENG-4452",
-            "status": "EXECUTED"
+            "status": "EXECUTED_VIA_FIREWALL",
+            "capability": "contracts_only"
         }
 
 
