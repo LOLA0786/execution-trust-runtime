@@ -1,29 +1,25 @@
 """
 base_agent.py
 
-Base class for all 3 agents (Procurement, Revenue Ops, Chief of Staff).
-Uses PrivateVault checkpoints at critical points.
-Skeleton only — no complex logic yet.
+Base for the 3 specialized agents. Enforces the exact pipeline with shared runtime.
+All agents delegate to HermesOrchestrator for Retrieval/Memory/Reflection/Research/Decision/Vault/Execution.
 """
 from typing import Dict, Any
 from core.vault.private_vault import vault
+from core.hermes.orchestrator import hermes
 
 
 class BaseAgent:
-    """Base for Execution Trust Runtime agents. All actions gated by PrivateVault."""
+    """Base class enforcing the full Execution Trust Runtime pipeline."""
     
-    def __init__(self, name: str):
+    def __init__(self, name: str, role: str = "chief_of_staff"):
         self.name = name
+        self.role = role
         self.vault = vault
+        self.orchestrator = hermes
     
     def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """All execution paths go through PrivateVault checkpoint."""
-        # Pre-checkpoint (additive)
-        snapshot = {"id": "snapshot-001", "state": task.get("approved_state", {})}
-        check = self.vault.validate_before_execution(snapshot, task)
-        
-        if check["verdict"] == "BLOCK":
-            return {"status": "BLOCKED", "replay": check.get("replay", [])}
-        
-        # Execution would go here in full implementation
-        return {"status": "EXECUTED", "result": "success"}
+        """Delegates to orchestrator for the full pipeline (non-bypassable Vault)."""
+        query = task.get("query", str(task))
+        output = self.orchestrator.run_pipeline(query, self.role)
+        return output.model_dump()
