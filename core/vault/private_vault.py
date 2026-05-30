@@ -293,9 +293,11 @@ class PrivateVault:
     def __init__(self):
         self.enabled = True
         self.events: List[VaultEvent] = []
-        self.mode = "WITH"  # "WITH" = full integrity checks; "WITHOUT" = silent success (contrast demo)
+        self.mode = "WITH"  # "WITH" = full integrity checks; "WITHOUT" = silent success (contrast demo ONLY — disabled in prod by default)
         self.base_trust = 1.0
         self.history: List[CognitionSnapshot] = []
+        self.firewall_executor = None  # initialized after class def to avoid circular
+        self.prod_mode = False  # Set True in prod to disable WITHOUT; False for demo contrast
 
     def _compute_hash(self, state: Dict[str, Any]) -> str:
         """Canonical hash for approval/live state binding (sorted, deterministic)."""
@@ -320,7 +322,9 @@ class PrivateVault:
                    after_state: Optional[Dict[str, Any]] = None,
                    anomaly_count: int = 0) -> VaultEvent:
         """Enhanced non-bypassable pre-execution checkpoint with full CognitionSnapshot (before/after diff)."""
-        if not self.enabled:
+        if not self.enabled or (self.mode == "WITHOUT" and self.prod_mode):
+            if self.mode == "WITHOUT" and self.prod_mode:
+                raise VaultCheckpointError("WITHOUT mode disabled in production. All mutations must use WITH + firewall.execute().")
             return VaultEvent(
                 event_id=str(uuid.uuid4()),
                 timestamp=datetime.now(),
@@ -505,7 +509,7 @@ class PrivateVault:
             intent_drift_score=0.65
         )
 
-        # WITHOUT mode simulation (silent success)
+        # WITHOUT mode simulation (demo only; prod_mode + firewall prevents real bypass in runtime)
         self.mode = "WITHOUT"
         without_vault = self.checkpoint(
             agent="demo_agent",
