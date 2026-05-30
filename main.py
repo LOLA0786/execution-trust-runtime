@@ -2,48 +2,19 @@
 """
 main.py
 
-Clean demo for deep PrivateVault.ai integration.
-Demonstrates:
-- WITHOUT Vault = silent success on mutation
-- WITH Vault = BLOCK + beautiful replay (full pipeline trace) + trust decay to 0.01
-Uses FirewalledExecutor, ApprovalBinding, AIFirewall, Merkle ledger.
+Entry point that runs the polished business-focused CXO demo from tests.demo.full_demo.
+Preserves all prior enforcement (stable Merkle, FirewalledExecutor, proxies, scoping, decorators).
 """
-from agents.procurement.agent import procurement_agent
-from agents.revenue_ops.agent import revenue_ops_agent
-from agents.chief_of_staff.agent import chief_of_staff_agent
-from core.vault.private_vault import vault, VaultCheckpointError
+from tests.demo.full_demo import run_full_demo
 import logging
 logging.basicConfig(level=logging.INFO)
 
 
 def main():
-    """Clean demo showing WITHOUT Vault = silent success vs WITH Vault = BLOCK + replay + trust=0.01."""
-    print("🚀 Execution Trust Runtime — Deep PrivateVault.ai Integration")
-    print("Firewalled execution • ApprovalBinding • AIFirewall • Merkle ledger • Capability scoping")
-    print("Every tool/mutation routed through PrivateVault.firewall.execute()\n")
-
-    # Core contrast demo (WITHOUT = silent success on mutation; WITH = BLOCK + beautiful replay)
-    print("=== WITHOUT Vault vs WITH Vault Contrast (Treasury + Revenue Anomaly) ===")
-    print(vault.contrast_demo("treasury"))
-    print("\n" + "="*90 + "\n")
-
-    print("Running Revenue Operations Agent (anomaly block graceful)...")
-    try:
-        rev_result = revenue_ops_agent.run()  # uses detect_anomaly with graceful BLOCK
-        print("RevenueOps Result:", rev_result.get("status", "SUCCESS"), "- trust:", rev_result.get("trust_score", 1.0))
-        if "BLOCKED" in str(rev_result):
-            print("✅ Graceful anomaly BLOCK with full replay + trust decay to 0.01")
-    except Exception as e:
-        print("RevenueOps BLOCKED gracefully:", str(e)[:100])
-
-    print("\n✅ Universal enforcement confirmed: All side effects (Jira.create_issue, slack.send_message, salesforce.update, email.send, calendar.create_event, etc.)")
-    print("   ONLY possible via PrivateVault.firewall.execute() + firewalled proxies.")
-    print("   Strict capability scoping active. Merkle ledger stable (no chain break errors).")
-    print("PrivateVault.ai patterns fully integrated. Zero unprotected paths.")
+    """Runs the polished business CXO-ready demo matching the refined investor sample output."""
+    run_full_demo()
 
 
 if __name__ == "__main__":
     main()
-    print("\n" + "="*90)
-    print("Demo complete. Run `python -m tests.demo.full_demo` for richer pipeline output.")
 
