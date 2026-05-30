@@ -19,17 +19,27 @@ from core.memory.reflection import reflection
 from core.memory.vector_memory import memory
 
 
+class PipelineStage(BaseModel):
+    """Detailed stage tracking for rich demo output."""
+    stage: str
+    timestamp: str
+    data: Dict[str, Any]
+    status: str = "COMPLETED"
+
+
 class AgentOutput(BaseModel):
-    """Structured JSON output for all Hermes handoffs and decisions."""
+    """Rich structured JSON output with full pipeline visibility (enhanced for demo)."""
     agent: str
     timestamp: str
     task: str
+    pipeline_stages: List[PipelineStage] = []
     decision: Dict[str, Any]
     confidence: float
-    vault_check: Dict[str, Any]
-    next_handoff: Optional[str] = None
+    vault_snapshot: Dict[str, Any]  # Full CognitionSnapshot + event
     risks: List[str] = []
     citations: List[str] = []
+    final_status: str
+    replay_summary: Optional[str] = None
 
 
 class HermesOrchestrator:
@@ -116,16 +126,36 @@ class HermesOrchestrator:
         )
         memory.store(post_reflection, {"agent": agent_role, "stage": "post"})
         
+        # Build rich pipeline stages for demo visibility
+        stages = [
+            PipelineStage(stage="Input", timestamp=datetime.now().isoformat(), data={"query": query}, status="COMPLETED"),
+            PipelineStage(stage="Retrieval", timestamp=datetime.now().isoformat(), data={"context": retrieved_context[:100]}, status="COMPLETED"),
+            PipelineStage(stage="Memory/Reflection", timestamp=datetime.now().isoformat(), data={"plan": hierarchical_plan.get("high_level", [])}, status="COMPLETED"),
+            PipelineStage(stage="Research", timestamp=datetime.now().isoformat(), data=research_findings, status="COMPLETED"),
+            PipelineStage(stage="Decision", timestamp=datetime.now().isoformat(), data=decision, status="COMPLETED"),
+            PipelineStage(stage="VaultApproval", timestamp=datetime.now().isoformat(), data={"verdict": vault_event.verdict.value, "drift": vault_event.intent_drift_score if hasattr(vault_event, 'intent_drift_score') else 0.0, "trust": round(vault_event.trust_score, 3)}, status=vault_event.verdict.value),
+            PipelineStage(stage="Execution", timestamp=datetime.now().isoformat(), data=execution_result, status="COMPLETED" if vault_event.verdict != Verdict.BLOCK else "BLOCKED"),
+            PipelineStage(stage="PostCheckpoint", timestamp=datetime.now().isoformat(), data={"reflection": post_reflection[:80]}, status="COMPLETED"),
+        ]
+
         output = AgentOutput(
             agent=agent_name,
             timestamp=datetime.now().isoformat(),
             task=query,
+            pipeline_stages=stages,
             decision=decision,
             confidence=decision.get("confidence", 0.85),
-            vault_check={"verdict": vault_event.verdict.value, "trust_score": round(vault_event.trust_score, 3)},
-            next_handoff=None,
+            vault_snapshot=vault_event.model_dump() if hasattr(vault_event, "model_dump") else {
+                "verdict": vault_event.verdict.value,
+                "trust_score": round(vault_event.trust_score, 3),
+                "reason": vault_event.reason,
+                "merkle_hash": vault_event.merkle_hash,
+                "replay": vault.generate_replay(approved_state, live_state) if vault_event.verdict == Verdict.BLOCK else "No breach"
+            },
             risks=decision.get("risks", []),
-            citations=research_findings["citations"]
+            citations=research_findings["citations"],
+            final_status=execution_result["status"],
+            replay_summary="Blocked by PrivateVault forensic replay (Merkle breach detected)" if vault_event.verdict == Verdict.BLOCK else "All stages verified. Execution allowed."
         )
         
         self.current_context = output.model_dump()

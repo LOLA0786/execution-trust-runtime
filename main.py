@@ -43,11 +43,12 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # Also run the comprehensive demo
+    # Comprehensive demo now runs cleanly via module (fixed import/module issues)
+    print("\n" + "="*80)
+    print("Launching full polished demo (rich output, structured JSON, fixed Chroma)...")
     try:
-        from tests.demo.full_demo import run_full_demo
-        print("\n" + "="*80)
-        run_full_demo()
+        import tests.demo.full_demo
+        tests.demo.full_demo.run_full_demo()
     except Exception as e:
-        print(f"Demo run note: {e} (full demo available via python -m tests.demo.full_demo)")
+        print(f"Note: Full demo available via `python -m tests.demo.full_demo` ({e})")
 

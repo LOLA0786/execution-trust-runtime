@@ -19,18 +19,21 @@ class ProcurementAgent:
         self.orchestrator = hermes
     
     def run(self, query: str = "Review SaaS contracts and recommend cancellations based on usage") -> Dict[str, Any]:
-        """Execute full pipeline with non-bypassable Vault checkpoint."""
+        """Execute full pipeline with non-bypassable Vault checkpoint. Returns rich structured Pydantic JSON."""
         output = self.orchestrator.run_pipeline(query, "procurement")
         
-        # Post-checkpoint reflection (additive)
-        if output.vault_check["verdict"] != "BLOCK":
+        # Post-checkpoint reflection (additive, richer output)
+        if getattr(output, 'vault_snapshot', {}).get('verdict', 'ALLOW') != "BLOCK":
             vault_event = vault.checkpoint(
                 agent=self.name,
                 task="post_execution_review",
-                approved_state={"status": "executed", "recommendation": output.decision["recommendation"]},
+                approved_state={"status": "executed", "recommendation": output.decision.get("recommendation", "SaaS cancellation")},
                 intent_drift_score=0.02
             )
-            return output.model_dump() | {"post_vault": vault_event.verdict.value}
+            result = output.model_dump()
+            result["post_vault"] = vault_event.verdict.value
+            result["pipeline_stages"] = [s.model_dump() if hasattr(s, 'model_dump') else s for s in output.pipeline_stages]
+            return result
         return output.model_dump()
     
     def cancel_saas(self, vendor: str = "Datadog", spend: int = 180000) -> Dict[str, Any]:

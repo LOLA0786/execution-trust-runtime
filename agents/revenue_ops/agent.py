@@ -19,17 +19,19 @@ class RevenueOpsAgent:
         self.orchestrator = hermes
     
     def run(self, query: str = "Review Salesforce pipeline for discount anomalies") -> Dict[str, Any]:
-        """Execute full pipeline. Triggers BLOCK on anomalies via Vault."""
+        """Execute full pipeline with structured Pydantic JSON output. Triggers detailed BLOCK on anomalies via Vault."""
         output = self.orchestrator.run_pipeline(query, "revenue_ops")
         
-        # Post-checkpoint (forensic replay if blocked)
-        if output.vault_check.get("verdict") == "BLOCK":
+        # Post-checkpoint (forensic replay if blocked) - richer demo output
+        result = output.model_dump()
+        if getattr(output, 'vault_snapshot', {}).get('verdict', 'ALLOW') == "BLOCK" or "BLOCK" in str(output.vault_snapshot):
             replay = vault.generate_replay(
                 {"discount_approved": 0.10, "status": "approved"},
                 {"discount_requested": 0.70, "status": "mutated"}
             )
-            return output.model_dump() | {"replay": replay[:300] + "..."}
-        return output.model_dump()
+            result["replay"] = replay[:400] + "... (full timeline in vault_snapshot)"
+            result["pipeline_stages"] = [s.model_dump() if hasattr(s, 'model_dump') else dict(s) for s in getattr(output, 'pipeline_stages', [])]
+        return result
     
     def detect_anomaly(self) -> Dict[str, Any]:
         """Demo anomaly detection (triggers Vault BLOCK)."""

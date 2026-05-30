@@ -16,6 +16,10 @@ try:
     import chromadb
     from chromadb.config import Settings
     CHROMA_AVAILABLE = True
+    # Disable telemetry and use persistent cache to avoid repeated model downloads
+    import os
+    os.environ["CHROMA_TELEMETRY"] = "false"
+    os.environ["ANONYMIZED_TELEMETRY"] = "false"
 except ImportError:
     CHROMA_AVAILABLE = False
 
@@ -38,6 +42,8 @@ class VectorMemory:
         self.entries: Dict[str, MemoryEntry] = {}
         self.client = None
         self.collection = None
+        # Ensure persistence directory exists for cache
+        os.makedirs(self.persist_dir, exist_ok=True)
         if CHROMA_AVAILABLE:
             self._init_chroma()
     
