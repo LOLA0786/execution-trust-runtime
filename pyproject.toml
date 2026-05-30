@@ -4,15 +4,17 @@ version = "0.1.0"
 description = "Runtime verification for autonomous enterprise agents with PrivateVault"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi",
-    "uvicorn",
-    "pydantic",
-    "redis",
-    "celery",
-    "langgraph",
-    "llama-index",
-    "neo4j",
-    "sqlalchemy",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.5.0",
+    "redis>=5.0.0",
+    "celery>=5.3.0",
+    "langgraph>=0.1.0",
+    "langchain-core>=0.1.0",
+    "llama-index>=0.10.0",
+    "chromadb>=0.4.0",
+    "qdrant-client>=1.7.0",
+    "sentence-transformers>=2.2.0",  # for embeddings
 ]
 
 [tool.setuptools]
@@ -20,3 +22,9 @@ packages = ["execution_trust_runtime"]
 
 [project.scripts]
 run = "main:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]

@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: execution-trust-runtime
+Version: 0.1.0
+Summary: Runtime verification for autonomous enterprise agents with PrivateVault
+Requires-Python: >=3.11
+Requires-Dist: fastapi>=0.104.0
+Requires-Dist: uvicorn>=0.24.0
+Requires-Dist: pydantic>=2.5.0
+Requires-Dist: redis>=5.0.0
+Requires-Dist: celery>=5.3.0
+Requires-Dist: langgraph>=0.1.0
+Requires-Dist: langchain-core>=0.1.0
+Requires-Dist: llama-index>=0.10.0
+Requires-Dist: chromadb>=0.4.0
+Requires-Dist: qdrant-client>=1.7.0
+Requires-Dist: sentence-transformers>=2.2.0
+Provides-Extra: test
+Requires-Dist: pytest>=7.0.0; extra == "test"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "test"
