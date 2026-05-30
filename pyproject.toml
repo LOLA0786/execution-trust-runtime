@@ -9,15 +9,17 @@ dependencies = [
     "pydantic>=2.5.0",
     "redis>=5.0.0",
     "celery[redis]>=5.3.0",
-    "langgraph>=0.1.0",
-    "langchain-core>=0.1.0",
+    "langgraph>=0.2.0",
+    "langchain-core>=0.2.0",
+    "langchain-community>=0.2.0",
     "llama-index>=0.10.0",
-    "chromadb>=0.4.0",
-    "qdrant-client>=1.7.0",
-    "sentence-transformers>=2.2.0",
+    "chromadb>=0.5.0",
+    "qdrant-client>=1.9.0",
+    "sentence-transformers>=3.0.0",
     "sqlalchemy>=2.0.0",
     "alembic>=1.12.0",
-    "psycopg2-binary>=2.9.0",  # for Postgres if used
+    "psycopg2-binary>=2.9.0",  # optional for Postgres
+    "python-dotenv>=1.0.0",
 ]
 
 [tool.setuptools]

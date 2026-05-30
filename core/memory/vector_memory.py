@@ -20,6 +20,7 @@ try:
     import os
     os.environ["CHROMA_TELEMETRY"] = "false"
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
 except ImportError:
     CHROMA_AVAILABLE = False
 

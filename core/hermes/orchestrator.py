@@ -8,7 +8,7 @@ and coordinates the exact pipeline: Inputs → Retrieval (LangGraph) → Memory/
 
 Non-bypassable Vault integration. Additive only.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 from pydantic import BaseModel
 import json
 from datetime import datetime
@@ -17,6 +17,17 @@ from core.vault.private_vault import vault, Verdict
 from services.retrieval.langgraph_router import retrieval_router
 from core.memory.reflection import reflection
 from core.memory.vector_memory import memory
+# Lazy imports to avoid circular dependency (agents import hermes singleton)
+def _get_agents():
+    from agents.procurement.agent import procurement_agent
+    from agents.revenue_ops.agent import revenue_ops_agent
+    from agents.chief_of_staff.agent import chief_of_staff_agent
+    return {
+        "procurement": procurement_agent,
+        "revenue_ops": revenue_ops_agent,
+        "chief_of_staff": chief_of_staff_agent,
+    }
+
 
 
 class PipelineStage(BaseModel):
@@ -43,15 +54,31 @@ class AgentOutput(BaseModel):
 
 
 class HermesOrchestrator:
-    """Multi-agent orchestrator with role-based routing and structured outputs."""
+    """Multi-agent orchestrator with proper registration, handoff, and structured routing (Hermes patterns)."""
     
     def __init__(self):
-        self.agents = {
+        self._agents = None  # lazy to avoid circular import
+        self.agent_names = {
             "procurement": "Enterprise Procurement Agent",
             "revenue_ops": "Revenue Operations Agent",
             "chief_of_staff": "Executive Chief of Staff Agent"
         }
         self.current_context = {}
+        self.handoff_history: List[Dict[str, Any]] = []
+    
+    @property
+    def agents(self):
+        """Lazy load registered agents to prevent circular import with agent modules."""
+        if self._agents is None:
+            self._agents = _get_agents()
+        return self._agents
+    
+    def register_agent(self, role: str, agent_instance: Any, name: str):
+        """Proper agent registration for dynamic handoff."""
+        if self._agents is None:
+            self._agents = _get_agents()
+        self._agents[role] = agent_instance
+        self.agent_names[role] = name
     
     def route(self, query: str, role: str = "auto") -> str:
         """Role-based routing (procurement, revenue, executive)."""
@@ -69,7 +96,9 @@ class HermesOrchestrator:
         """
         if not agent_role:
             agent_role = self.route(query)
-        agent_name = self.agents.get(agent_role, "chief_of_staff")
+        agent_name = self.agent_names.get(agent_role, "chief_of_staff")
+        # Use registered agent instance for execution if available
+        agent_instance = self.agents.get(agent_role)
         
         # 1. Inputs + Retrieval (LangGraph + LlamaIndex multi-hop)
         retrieval_result = retrieval_router.run(query)
@@ -112,11 +141,17 @@ class HermesOrchestrator:
             intent_drift_score=0.15 if "block" in query.lower() else 0.05
         )
         
-        # 6. Execution (gated by vault)
+        # 6. Execution (gated by vault; use registered agent if available for real handoff)
         if vault_event.verdict == Verdict.BLOCK:
             execution_result = {"status": "BLOCKED", "reason": vault_event.reason, "replay": vault.generate_replay(approved_state, live_state)}
         else:
-            execution_result = self._execute_action(agent_role, decision)
+            if agent_instance and hasattr(agent_instance, 'run'):
+                try:
+                    execution_result = agent_instance.run(query)  # delegate to specialized agent
+                except Exception:
+                    execution_result = self._execute_action(agent_role, decision)
+            else:
+                execution_result = self._execute_action(agent_role, decision)
         
         # 7. Post-checkpoint reflection + output
         post_reflection = reflection.reflect_on_task(
@@ -194,9 +229,25 @@ class HermesOrchestrator:
         }
     
     def handoff(self, from_agent: str, to_agent: str, context: Dict[str, Any]) -> AgentOutput:
-        """Multi-agent handoff with structured output."""
+        """Multi-agent handoff logic with registration check and structured output."""
+        if to_agent not in self.agents:
+            self.register_agent(to_agent, chief_of_staff_agent, "Executive Chief of Staff Agent")  # fallback
+        
+        self.handoff_history.append({
+            "from": from_agent,
+            "to": to_agent,
+            "context_summary": context.get("summary", "Handoff"),
+            "timestamp": datetime.now().isoformat()
+        })
+        
         query = f"Handoff from {from_agent} to {to_agent}: {context.get('summary', 'Review context')}"
-        return self.run_pipeline(query, to_agent.replace("_", "_"))
+        # Route to registered agent instance if possible
+        target_role = to_agent if to_agent in self.agents else "chief_of_staff"
+        return self.run_pipeline(query, target_role)
+    
+    def get_handoff_history(self) -> List[Dict[str, Any]]:
+        """Return handoff audit trail (tied to PrivateVault checkpoints)."""
+        return self.handoff_history
 
 
 # Singleton orchestrator
