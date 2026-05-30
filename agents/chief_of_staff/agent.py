@@ -8,7 +8,7 @@ Full pipeline: Inputs (Slack/Email/Jira/CRM/Calendar) → Retrieval → Memory/R
 """
 from typing import Dict, Any
 from core.hermes.orchestrator import hermes
-from core.vault.private_vault import vault
+from core.vault.private_vault import vault, vault_checkpoint, VaultCheckpointError
 
 
 class ChiefOfStaffAgent:
@@ -19,24 +19,28 @@ class ChiefOfStaffAgent:
         self.orchestrator = hermes
     
     def run(self, query: str = "Aggregate all sources and produce Top 5 decisions with risks") -> Dict[str, Any]:
-        """Execute full pipeline for executive synthesis. Returns rich structured Pydantic output with detailed Vault snapshots."""
+        """Execute full pipeline (uses @vault_checkpoint on top_decisions for enforcement)."""
         output = self.orchestrator.run_pipeline(query, "chief_of_staff")
-        
-        # Post-checkpoint reflection - ensure structured output
-        vault_event = vault.checkpoint(
-            agent=self.name,
-            task="executive_summary_review",
-            approved_state={"decisions": output.decision.get("recommendation", "Top 5 listed"), "risks": output.risks},
-            intent_drift_score=0.08
-        )
         result = output.model_dump()
-        result["post_vault_verdict"] = vault_event.verdict.value
-        result["pipeline_stages"] = [s.model_dump() if hasattr(s, 'model_dump') else dict(s) for s in getattr(output, 'pipeline_stages', [])]
+        try:
+            decisions_result = self.top_decisions()
+            result.update({"execution": decisions_result})
+        except VaultCheckpointError as e:
+            result["vault_block"] = str(e)
+            result["status"] = "BLOCKED"
         return result
+
     
-    def top_decisions(self) -> Dict[str, Any]:
-        """Demo for Top 5 executive decisions."""
-        return self.run("Synthesize Slack, Email, Jira, CRM, Calendar into Top 5 decisions with risks and follow-ups")
+    @vault_checkpoint(task_name="execute_top_decisions")
+    def top_decisions(self, state: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Top decisions action using @vault_checkpoint decorator."""
+        if not state:
+            state = {"decisions": 5, "risks_identified": 3}
+        return {
+            "recommendation": "Top 5 decisions: 1. Procurement cancel, 2. Revenue BLOCK, 3. Exec sync, 4. Pipeline review, 5. Audit.",
+            "risks": ["timing", "alignment", "compliance"],
+            "status": "EXECUTED"
+        }
 
 
 chief_of_staff_agent = ChiefOfStaffAgent()

@@ -8,7 +8,7 @@ Full pipeline: Inputs (contracts/Jira/spend/usage) → Retrieval (LangGraph) →
 """
 from typing import Dict, Any
 from core.hermes.orchestrator import hermes
-from core.vault.private_vault import vault
+from core.vault.private_vault import vault, vault_checkpoint, VaultCheckpointError
 
 
 class ProcurementAgent:
@@ -19,27 +19,28 @@ class ProcurementAgent:
         self.orchestrator = hermes
     
     def run(self, query: str = "Review SaaS contracts and recommend cancellations based on usage") -> Dict[str, Any]:
-        """Execute full pipeline with non-bypassable Vault checkpoint. Returns rich structured Pydantic JSON."""
+        """Execute full pipeline (uses @vault_checkpoint on cancel_saas)."""
         output = self.orchestrator.run_pipeline(query, "procurement")
-        
-        # Post-checkpoint reflection (additive, richer output)
-        if getattr(output, 'vault_snapshot', {}).get('verdict', 'ALLOW') != "BLOCK":
-            vault_event = vault.checkpoint(
-                agent=self.name,
-                task="post_execution_review",
-                approved_state={"status": "executed", "recommendation": output.decision.get("recommendation", "SaaS cancellation")},
-                intent_drift_score=0.02
-            )
-            result = output.model_dump()
-            result["post_vault"] = vault_event.verdict.value
-            result["pipeline_stages"] = [s.model_dump() if hasattr(s, 'model_dump') else s for s in output.pipeline_stages]
-            return result
-        return output.model_dump()
+        result = output.model_dump()
+        try:
+            # Demonstrate decorator on execution step
+            cancel_result = self.cancel_saas()
+            result.update({"execution": cancel_result})
+        except VaultCheckpointError as e:
+            result["vault_block"] = str(e)
+            result["status"] = "BLOCKED"
+        return result
     
-    def cancel_saas(self, vendor: str = "Datadog", spend: int = 180000) -> Dict[str, Any]:
-        """Specialized action for SaaS optimization demo."""
-        query = f"Analyze and cancel {vendor} contract at ${spend} with low usage"
-        return self.run(query)
+    @vault_checkpoint(task_name="execute_saas_cancellation")
+    def cancel_saas(self, vendor: str = "Datadog", spend: int = 180000, state: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Specialized action using @vault_checkpoint decorator (enforces pre-execution gate)."""
+        if not state:
+            state = {"vendor": vendor, "spend": spend, "usage_pct": 12}
+        return {
+            "recommendation": f"Cancel {vendor} SaaS subscription (${spend} at {state.get('usage_pct', 12)}% usage).",
+            "jira_ticket": "ENG-4452",
+            "status": "EXECUTED"
+        }
 
 
 procurement_agent = ProcurementAgent()

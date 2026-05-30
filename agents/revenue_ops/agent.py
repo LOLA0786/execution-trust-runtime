@@ -8,7 +8,7 @@ Full pipeline: Inputs (Salesforce/CRM pipeline) → Retrieval → Memory/Reflect
 """
 from typing import Dict, Any
 from core.hermes.orchestrator import hermes
-from core.vault.private_vault import vault
+from core.vault.private_vault import vault, vault_checkpoint, VaultCheckpointError
 
 
 class RevenueOpsAgent:
@@ -19,23 +19,30 @@ class RevenueOpsAgent:
         self.orchestrator = hermes
     
     def run(self, query: str = "Review Salesforce pipeline for discount anomalies") -> Dict[str, Any]:
-        """Execute full pipeline with structured Pydantic JSON output. Triggers detailed BLOCK on anomalies via Vault."""
+        """Execute full pipeline. Uses @vault_checkpoint on detect_anomaly for deeper enforcement."""
         output = self.orchestrator.run_pipeline(query, "revenue_ops")
-        
-        # Post-checkpoint (forensic replay if blocked) - richer demo output
         result = output.model_dump()
-        if getattr(output, 'vault_snapshot', {}).get('verdict', 'ALLOW') == "BLOCK" or "BLOCK" in str(output.vault_snapshot):
-            replay = vault.generate_replay(
-                {"discount_approved": 0.10, "status": "approved"},
-                {"discount_requested": 0.70, "status": "mutated"}
-            )
-            result["replay"] = replay[:400] + "... (full timeline in vault_snapshot)"
-            result["pipeline_stages"] = [s.model_dump() if hasattr(s, 'model_dump') else dict(s) for s in getattr(output, 'pipeline_stages', [])]
+        # Demonstrate decorator in action via direct call (handles BLOCK via exception in real use)
+        try:
+            anomaly_result = self.detect_anomaly()
+            result.update(anomaly_result)
+        except VaultCheckpointError as e:
+            result["vault_block"] = str(e)
+            result["status"] = "BLOCKED"
         return result
+
     
-    def detect_anomaly(self) -> Dict[str, Any]:
-        """Demo anomaly detection (triggers Vault BLOCK)."""
-        return self.run("Analyze pipeline: 10% approved vs 70% requested discount")
+    @vault_checkpoint(task_name="detect_revenue_anomaly", anomaly_threshold=1)
+    def detect_anomaly(self, state: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Demo anomaly detection using @vault_checkpoint decorator (enforces BLOCK on discount mutation)."""
+        if not state:
+            state = {"pipeline": "Q3", "requested_discount": 0.70, "approved_discount": 0.10}
+        # Simulated execution only reaches here on ALLOW (demo uses high drift for BLOCK)
+        return {
+            "recommendation": "BLOCK discount approval (10% approved vs 70% requested). Escalate to CFO.",
+            "status": "BLOCKED_BY_VAULT",
+            "anomaly_detected": True
+        }
 
 
 revenue_ops_agent = RevenueOpsAgent()
