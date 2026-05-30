@@ -51,5 +51,86 @@
       "Execution"
     ],
     "event_id": "stable-event"
+  },
+  {
+    "event_type": "checkpoint",
+    "approved_state": {
+      "service": "jira",
+      "method": "create_issue",
+      "args": "()",
+      "kwargs": "{'summary': 'Test'}"
+    },
+    "live_state": {
+      "service": "jira",
+      "method": "create_issue",
+      "args": "()",
+      "kwargs": "{'summary': 'Test'}"
+    },
+    "merkle_hash": "01755f825f5ac14ae35ae4c376cb6ad61948bfcf0ad323eb887015db777294ef",
+    "trust_score": 0.9025,
+    "verdict": "ALLOW",
+    "reason": "Drift=0.05, anomalies=0, mode=WITH",
+    "agent_identity": "jira",
+    "pipeline_trace": [
+      "Retrieval (LangGraph multi-hop)",
+      "Memory/Reflection (gbrain)",
+      "Research",
+      "Decision (Hermes)",
+      "Approval (Vault)",
+      "Execution"
+    ],
+    "event_id": "stable-event-0"
+  },
+  {
+    "event_type": "checkpoint",
+    "approved_state": {
+      "service": "jira",
+      "method": "create_issue",
+      "args": "()",
+      "kwargs": "{'summary': 'Test'}"
+    },
+    "live_state": {
+      "service": "jira",
+      "method": "create_issue",
+      "args": "()",
+      "kwargs": "{'summary': 'Test'}"
+    },
+    "merkle_hash": "ded51e08271dc193da73e38129fa2d35b96cf3573d294837a38834e120491f89",
+    "trust_score": 0.9025,
+    "verdict": "ALLOW",
+    "reason": "Drift=0.05, anomalies=0, mode=WITH",
+    "agent_identity": "jira",
+    "pipeline_trace": [
+      "Retrieval (LangGraph multi-hop)",
+      "Memory/Reflection (gbrain)",
+      "Research",
+      "Decision (Hermes)",
+      "Approval (Vault)",
+      "Execution"
+    ],
+    "event_id": "stable-event-0"
+  },
+  {
+    "event_type": "checkpoint",
+    "approved_state": {
+      "approved": true
+    },
+    "live_state": {
+      "approved": true
+    },
+    "merkle_hash": "607dcb8094998c5cab94c640e6a3e5c87815fafeb0d4e4c6dd9404a6200188af",
+    "trust_score": 0.9025,
+    "verdict": "ALLOW",
+    "reason": "Drift=0.05, anomalies=0, mode=WITH",
+    "agent_identity": "test_agent",
+    "pipeline_trace": [
+      "Retrieval (LangGraph multi-hop)",
+      "Memory/Reflection (gbrain)",
+      "Research",
+      "Decision (Hermes)",
+      "Approval (Vault)",
+      "Execution"
+    ],
+    "event_id": "stable-event-0"
   }
 ]
