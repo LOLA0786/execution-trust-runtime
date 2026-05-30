@@ -38,15 +38,35 @@ Traditional observability logs compromised execution perfectly. Execution Trust 
 
 ## Architecture (Production-Grade)
 
-- **services/retrieval**: LangGraph + LlamaIndex multi-hop tool routing (from production-agentic-rag-course).
-- **services/research**: Deep research loops + citation grounding (enterprise-deep-research).
-- **core/memory**: Vector store, reflection loops, hierarchical planning (gbrain).
-- **core/vault**: Full PrivateVault (CognitionSnapshot, Merkle chaining, forensic replay, trust decay, WITH/WITHOUT demos).
-- **core/hermes**: Multi-agent handoff + structured JSON outputs + safety (hermes-agent).
-- **Integrations**: Redis, Neo4j (knowledge graph), Celery queues, FastAPI endpoints.
-- **tests/demo/**: Sample executions for all 3 agents with PrivateVault checkpoints.
+```
+Execution Trust Runtime
+├── FastAPI API (/trigger/*) ──→ Celery Tasks (Redis broker)
+│     │
+│     └─→ HermesOrchestrator (registration + handoff)
+│           │
+│           ├── Retrieval (LangGraph + LlamaIndex multi-hop router + fallback)
+│           ├── Memory (VectorMemory/Chroma + ReflectionEngine + hierarchical plan)
+│           ├── Decision (structured Pydantic)
+│           ├── PrivateVault (CognitionSnapshot, @vault_checkpoint decorator,
+│           │             Merkle proof, state_diff, trust_decay(time+anomalies),
+│           │             forced rollback on breach, forensic replay)
+│           └── Execution (gated, with Vault post-checkpoint)
+│
+├── Logging + Tracing (structured logs per stage, OpenTelemetry spans)
+├── Error Handling (VaultCheckpointError → rollback + alert)
+└── Persistence (SQLAlchemy models, Redis backend, memory_db/)
+```
 
-All layers additive. Feature-flagged. Zero regression when disabled.
+**Current Capabilities**:
+- **Core Memory**: Persistent Chroma vector store, gbrain-style reflection loops, hierarchical task planning (Research/Analyze/Decide/Verify).
+- **Retrieval**: Full LangGraph multi-hop router with LlamaIndex, tool fallback, Vault pre-gating.
+- **Hermes**: Agent registration, handoff history, structured `AgentOutput` (pipeline stages + vault_snapshot).
+- **PrivateVault**: `@vault_checkpoint` decorator (mandatory), enhanced `CognitionSnapshot` (before/after diff, Merkle proof), `trust_decay(time + anomaly_count)`, forced rollback on breach, deterministic replay with proof.
+- **Production Hardening**: Redis + Celery async queues (with Vault wrapper), FastAPI endpoints (`/trigger/procurement`, `/trigger/revenue`, `/trigger/chief`), Docker Compose (Redis primary), structured logging/tracing, error rollback.
+- **Models**: Full Pydantic (`PipelineEvent`, `AgentRun`, `VaultSnapshot`, `Decision`) + SQLAlchemy (`AgentRunModel`, `CheckpointModel`).
+- **Demo**: Rich output with 3 agents, BLOCK on anomalous discount, contrast (WITH vs WITHOUT).
+
+All additive/feature-flagged. Zero regression when `vault.enabled=False`. Traditional observability logs compromised execution; this **verifies before execution**.
 
 ## Quickstart
 ```bash

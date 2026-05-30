@@ -3,7 +3,9 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass redis_password
+    volumes:
+      - redis_data:/data
 
   app:
     build: .
@@ -17,17 +19,23 @@ services:
       - .:/app
     depends_on:
       - redis
+    # Production: run both API + Celery worker (or scale separately)
+    command: >
+      sh -c "uvicorn app.main_fastapi:app --host 0.0.0.0 --port 8000 & 
+             celery -A celery_app worker --loglevel=info"
 
-  # Optional Neo4j for knowledge graph (knowledge_graph/ dir)
-  # neo4j:
-  #   image: neo4j:5-community
-  #   ports:
-  #     - "7474:7474"
-  #     - "7687:7687"
+  # Optional: Postgres for SQLAlchemy models
+  # db:
+  #   image: postgres:15
   #   environment:
-  #     - NEO4J_AUTH=neo4j/password
+  #     POSTGRES_DB: trust_runtime
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #   ports:
+  #     - "5432:5432"
   #   volumes:
-  #     - neo4j_data:/data
+  #     - postgres_data:/var/lib/postgresql/data
 
-# volumes:
-#   neo4j_data:
+volumes:
+  redis_data:
+  # postgres_data:
