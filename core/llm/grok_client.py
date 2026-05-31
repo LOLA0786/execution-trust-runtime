@@ -25,7 +25,7 @@ class GrokClient:
         self.api_key = api_key or os.getenv("XAI_API_KEY")
         if not self.api_key:
             logger.warning("XAI_API_KEY not set. Using mock responses for tests/demo.")
-            self.api_key = "xai-9sKvwBjGFtdiTMAKFh93UpQbvugb6H3oEB7aTon53wPDP9lQQonKJO3TGQFL3nDr3bf0ftwytTapQLMg"
+            self.api_key = os.getenv("XAI_API_KEY", "sk-mock-for-ci")  # placeholder; real key in env (not committed)
         self.default_model = default_model
         self.base_url = "https://api.x.ai/v1"
         self.client = httpx.Client(timeout=30.0)
