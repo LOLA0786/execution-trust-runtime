@@ -3,3 +3,8 @@ __pycache__/
 memory_db/
 *.sqlite3
 .DS_Store
+.env
+core/llm/grok_client.py
+*.pyc
+__pycache__/
+venv*/
