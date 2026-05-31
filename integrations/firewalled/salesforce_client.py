@@ -4,9 +4,9 @@ Firewalled Salesforce client per spec. Every call must go through PrivateVault (
 Supports real requests (when env vars set) or realistic mock data for demo/live_demo.
 Compatible with simple-salesforce patterns but uses direct REST for minimal deps.
 """
+from __future__ import annotations
 import os
 import requests
-from __future__ import annotations
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging

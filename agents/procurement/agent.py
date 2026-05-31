@@ -10,6 +10,9 @@ from typing import Dict, Any
 from core.hermes.orchestrator import hermes
 from core.vault.private_vault import vault, vault_checkpoint, VaultCheckpointError
 from integrations.firewalled import jira  # All calls must use this firewalled proxy
+
+
+class ProcurementAgent:
     """Enterprise Procurement Agent with mandatory PrivateVault gates."""
     
     def __init__(self):
