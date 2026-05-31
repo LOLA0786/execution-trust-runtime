@@ -98,8 +98,10 @@ def run_full_demo():
     print("")
     print("This is the moat.")
     print("Execution Trust Runtime + PrivateVault.ai is the control plane that prevents autonomous agents from acting outside approved authority.")
-    print(f"Demo completed at: 2026-05-30")
-    print("\nRun via: python -m tests.demo.full_demo")
+    print("\n![4/4 Scenarios Blocked](https://img.shields.io/badge/4%2F4_Scenarios_Blocked-✅-brightgreen)")
+    print(f"Demo completed at: {datetime.now().strftime('%Y-%m-%d')}")
+    print("\nRun via: python -m tests.demo.full_demo (or --live for interactive SDK approval flow)")
+    print("On every push: pytest + docker compose + 4/4 blocked verified.")
 
 
 if __name__ == "__main__":

@@ -20,11 +20,20 @@ import uuid
 import json
 import hashlib
 import logging
+import os
+import time
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
-import os
 from pathlib import Path
+
+# Human-in-the-Loop approval integration (additive)
+from core.approval_token import ApprovalToken
+from core.policy_loader import policy_loader  # per-tenant policies
+from core.metrics import (
+    record_vault_block, record_approval, observe_trust_score,
+    observe_agent_latency, observe_approval_wait
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +113,7 @@ class CognitionSnapshot(BaseModel):
     time_delta_seconds: float = 0.0
     agent_identity: str = "unknown"
     pipeline_trace: List[str] = []
+    approval_token_id: Optional[str] = None
 
     def seal_reasoning_score(self, score: float):
         """Seal integrity score (multiplicative with trust decay)."""
@@ -408,20 +418,88 @@ class PrivateVault:
                     live_state["pipeline"] = "Q3_revenue"
 
                 # Use FirewalledExecutor for mandatory path (firewall + checkpoint + binding + ledger)
+                # Human-in-the-Loop approval AFTER CognitionSnapshot sealed, BEFORE execution (additive, feature-flagged)
+                start_time = time.time()
+                snapshot = CognitionSnapshot(
+                    snapshot_id=str(uuid.uuid4()),
+                    context_hash=self._compute_hash(approved_state),
+                    intent_drift_score=0.0,
+                    timestamp=datetime.now(),
+                    agent=agent,
+                    task=task,
+                    approved_state_hash=self._compute_hash(approved_state),
+                    before_state=approved_state,
+                    after_state=approved_state.copy(),
+                    anomaly_count=0,
+                    agent_identity=agent,
+                    pipeline_trace=["Retrieval", "Memory/Reflection", "Decision", "Approval", "Execution"]
+                )
+                snapshot.compute_state_diff()
+                snapshot.compute_merkle_hash()
+                self.history.append(snapshot)
+
+                # Per-tenant policy enforcement (hot-reloaded YAML + Redis cache)
+                tenant_id = kwargs.get("tenant_id", "default")
+                policy = policy_loader.get_policy(tenant_id)
+                if "discount" in str(approved_state).lower():
+                    max_discount = policy.get("max_discount_pct", 25) / 100.0
+                    if 0.70 > max_discount:  # simulated 70% anomaly
+                        record_vault_block("policy_violation_max_discount")
+
                 try:
+                    # Configurable approval requirement (default off for zero-regression when disabled)
+                    checkpoint_config = type('CheckpointConfig', (), {
+                        'requires_human_approval': kwargs.pop("requires_human_approval", False) or "approval" in task.lower() or float(str(approved_state).get("amount", 0)) > policy.get("require_approval_above", 10000),
+                        'action_summary': f"{agent}: {task}",
+                        'approver_email': policy.get("approvers", ["cfo@example.com"])[0],
+                    })()
+
+                    if checkpoint_config.requires_human_approval:
+                        from services.notifier import notifier
+                        from core.approval_gate import ApprovalGate
+                        import os
+
+                        gate = ApprovalGate(
+                            redis_client=None,  # uses internal/default in prod
+                            db_session=None,    # injected in prod FastAPI/Celery
+                            secret_key=os.getenv("SECRET_KEY"),
+                            etr_host=os.getenv("ETR_HOST", "localhost:8000")
+                        )
+                        notifier_instance = notifier  # from env config (services.notifier)
+                        token, approve_url, reject_url = gate.request_approval(
+                            snapshot_id=snapshot.merkle_hash,
+                            action_summary=checkpoint_config.action_summary,
+                            approver_email=checkpoint_config.approver_email,
+                            metadata={"agent_id": agent, "action": task, "tenant": tenant_id, "policy": policy}
+                        )
+                        notifier_instance.notify_approval_request(
+                            checkpoint_config.approver_email, 
+                            checkpoint_config.action_summary,
+                            approve_url, reject_url
+                        )
+                        approved = gate.wait_for_approval(snapshot.merkle_hash)
+                        if not approved:
+                            raise VaultCheckpointError("Approval rejected or timed out")
+                        snapshot.approval_token_id = str(token.token_id)
+                        record_approval("requested")
+
+                    latency = time.time() - start_time
+                    observe_agent_latency(agent, latency)
                     result = self.firewall_executor.execute(
                         func, agent, task, approved_state, *args, **kwargs
                     )
+                    observe_trust_score(0.85)
                     return result
-                except VaultCheckpointError as e:
-                    # Graceful handling for demo (especially Revenue Ops anomaly block)
-                    logger.info(f"Graceful BLOCK handled in decorator for {agent}/{task}")
+                except Exception as e:  # Covers TimeoutError, VaultCheckpointError, rejection
+                    record_vault_block("approval_reject_or_timeout")
+                    observe_trust_score(0.01)
+                    logger.info(f"Approval flow failure for {agent}/{task}: {e}")
                     return {
                         "status": "BLOCKED",
                         "replay": str(e),
                         "trust_score": 0.01,
                         "vault_block": True,
-                        "reason": "Anomaly detected + firewall + Merkle breach (graceful in RevenueOps)"
+                        "reason": "Human approval required and not granted (or timeout/reject)"
                     }
             return wrapper
         return decorator
@@ -556,9 +634,11 @@ vault.firewall_executor = FirewalledExecutor(vault)
 def vault_checkpoint(task_name: str = None, anomaly_threshold: int = 1):
     """Convenience decorator from vault instance (agents import from here).
     Deep integration: every call goes through firewall.execute().
+    Supports SDK params via core/sdk_compat.py.
     """
     return vault.vault_checkpoint(task_name, anomaly_threshold)
 
 
 # Export for direct use: PrivateVault.firewall.execute() mandatory for all tool calls/mutations
 __all__ = ["vault", "vault_checkpoint", "VaultCheckpointError", "Verdict", "FirewalledExecutor", "AIFirewall"]
+

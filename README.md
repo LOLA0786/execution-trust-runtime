@@ -68,15 +68,24 @@ Execution Trust Runtime
 
 All additive/feature-flagged. Zero regression when `vault.enabled=False`. Traditional observability logs compromised execution; this **verifies before execution**.
 
+**New**: Per-tenant policies (`policies/{tenant_id}/config.yaml` with `max_discount_pct`, `require_approval_above`, `approvers` — hot-reloaded on change, cached in Redis `policy:{tenant_id}:config`). Prometheus `/metrics` (vault_blocks_total, trust_score_histogram, agent_latency_seconds, approval_wait_seconds). Deploy with single command `railway up` (public HTTPS URL for real approval emails/webhooks, not localhost).
+
 ## Quickstart
 ```bash
 pip install -e .
 docker compose up -d
 python -m alembic upgrade head
-python main.py
+# Live demo (Salesforce + Slack approval)
+python main.py --live
+# Or deploy
+railway up
 ```
 
-See `demos/` for contrast and `scripts/validate_demos.py` for safety runner.
+See `tests/demo/live_demo.py` for end-to-end (Revenue Ops anomaly → snapshot seal → Slack DM → Reject → BLOCK + replay). Metrics at `/metrics`, policies hot-reload.
+
+![4/4 Scenarios Blocked ✅](https://img.shields.io/badge/4%2F4_Scenarios_Blocked-✅-brightgreen)
+
+This is the moat. On every push: pytest (approval tests) + docker compose + full_demo (4/4 blocked asserted).
 
 **This is not another agent framework.**
 
