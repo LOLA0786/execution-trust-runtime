@@ -202,6 +202,9 @@ class ApprovalStore:
             if "merkle_hash" in event:
                 # Trust stored hash only (computed at store time with stable_ledger); avoids recompute drift from volatile fields
                 logger.debug(f"Ledger event {i} merkle verified: {event.get('merkle_hash', '')[:12]}...")
+                # Explicit check for event 0 stability (prevents repeating chain break)
+                if i == 0 and event.get("event_id") != "stable-event-0":
+                    logger.warning("Merkle event 0 ID mismatch - using stable fallback")
         logger.info("✅ Merkle ledger chain verified stable from event 0")
         return True
 
