@@ -78,5 +78,23 @@ class CheckpointModel(Base):
     task = Column(String)
 
 
+class ApprovalRequestModel(Base):
+    """Human-in-the-Loop approval requests. Replaces flat approvals_ledger.json.
+    Cryptographically binds human decision to snapshot_id (Merkle hash).
+    """
+    __tablename__ = "approval_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id = Column(String, unique=True, index=True, nullable=False)
+    action_summary = Column(String, nullable=False)
+    approver_email = Column(String, nullable=False)
+    status = Column(String, default="PENDING")  # PENDING, APPROVED, REJECTED
+    requested_at = Column(DateTime, default=datetime.utcnow)
+    decided_at = Column(DateTime, nullable=True)
+    token_id = Column(String, unique=True, index=True)
+    hmac_signature = Column(String)
+    metadata_ = Column(JSON, nullable=True)  # renamed to avoid SQLAlchemy reserved 'metadata' conflict on Base
+
+
 # For alembic/migrations (mentioned in README)
-__all__ = ["Base", "AgentRunModel", "PipelineEventModel", "CheckpointModel"]
+__all__ = ["Base", "AgentRunModel", "PipelineEventModel", "CheckpointModel", "ApprovalRequestModel"]

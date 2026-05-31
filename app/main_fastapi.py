@@ -20,13 +20,29 @@ from agents.procurement.agent import procurement_agent
 from agents.revenue_ops.agent import revenue_ops_agent
 from agents.chief_of_staff.agent import chief_of_staff_agent
 from core.vault.private_vault import vault, VaultCheckpointError
+from core.policy_loader import policy_loader  # per-tenant policies with hot-reload
+from core.metrics import get_metrics  # Prometheus metrics
 from shared.schemas.event_schemas import PipelineEvent, AgentRun
 from celery_app import celery_app, execute_agent_pipeline
+from app.approval_webhook import router as approval_router
 
 app = FastAPI(
     title="Execution Trust Runtime API",
-    description="Triggers for 3 agents with PrivateVault checkpoints. Redis/Celery backend."
+    description="Triggers for 3 agents with PrivateVault checkpoints, per-tenant policies (hot-reload), and Prometheus metrics. Redis/Celery/Postgres backend."
 )
+
+app.include_router(approval_router)
+
+# Mount policy loader (hot-reload + Redis per-tenant)
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting with per-tenant policy loader (hot-reload on policies/*.yaml)")
+    # Policies loaded on import; watcher started
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint (vault_blocks_total, trust_score_histogram, etc.)."""
+    return get_metrics()  # bytes response with all counters/histograms
 
 class AgentRequest(BaseModel):
     query: str

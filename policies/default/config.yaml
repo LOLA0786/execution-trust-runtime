@@ -1,0 +1,13 @@
+# Per-tenant policy configuration (hot-reloaded on change)
+# Used by ApprovalGate, vault_checkpoint, agents for enforcement.
+max_discount_pct: 25
+max_payment_amount: 25000
+require_approval_above: 10000
+approvers:
+  - cfo@company.com
+  - security@company.com
+# Additional per-tenant rules can be added here
+capability_scopes:
+  revenue_ops: ["discounts", "anomalies", "pipeline"]
+  procurement: ["contracts", "vendors", "payments"]
+trust_decay_base: 1.0

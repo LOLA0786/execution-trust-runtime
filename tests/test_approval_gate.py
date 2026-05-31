@@ -6,7 +6,7 @@ Fully implemented per spec: happy_path, rejection, timeout, tampering, replay.
 No stubs.
 """
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock, Mock
 from datetime import datetime, timedelta
 import asyncio
 import fakeredis
@@ -56,34 +56,36 @@ def test_gate(test_db_session, test_redis):
 @pytest.mark.asyncio
 async def test_happy_path(test_gate, test_db_session, test_redis):
     """Happy path: request_approval → mock Redis APPROVED → validate_and_record → returns True."""
-    with patch.object(test_gate, 'notify_approval_request', new_callable=AsyncMock) as mock_notify:
-        mock_notify.return_value = True
-        test_redis.set("approval:snapshot-123:token", "valid-hmac-signature")
-        test_redis.set("approval:snapshot-123:decision", "PENDING")
+    # Patch both gate instance method (for test_gate fixture) and facade
+    with patch.object(test_gate, 'notify_approval_request') as gate_mock:
+        gate_mock.return_value = None
+        with patch('services.notifier.notifier.notify_approval_request') as facade_mock:
+            facade_mock.return_value = True
+            test_redis.set("approval:snapshot-123:token", "valid-hmac-signature")
+            test_redis.set("approval:snapshot-123:decision", "APPROVED")
 
-        # Simulate approval via Redis
-        test_redis.set("approval:snapshot-123:decision", "APPROVED")
+            token, approve_url, reject_url = test_gate.request_approval(
+                snapshot_id="snapshot-123",
+                action_summary="Process $5.2M vendor payment to Acme Corp",
+                approver_email="cfo@example.com",
+                metadata={"agent_id": "procurement-1", "action": "payment"},
+            )
+            assert token.snapshot_id == "snapshot-123"
+            assert "approval" in approve_url
 
-        token, approve_url, reject_url = test_gate.request_approval(
-            snapshot_id="snapshot-123",
-            action_summary="Process $5.2M vendor payment to Acme Corp",
-            approver_email="cfo@example.com",
-            metadata={"agent_id": "procurement-1", "action": "payment"},
-        )
-        assert token.snapshot_id == "snapshot-123"
-        assert "approval" in approve_url
+            # wait_for_approval now sees APPROVED immediately (no polling/timeout)
+            approved = test_gate.wait_for_approval("snapshot-123", timeout_seconds=1, poll_interval=0.01)
+            assert approved is True
 
-        approved = test_gate.wait_for_approval("snapshot-123", timeout_seconds=1, poll_interval=0.01)
-        assert approved is True
-
-        # validate_and_record after approval
-        validated = test_gate.validate_and_record(
-            token_id=token.token_id,
-            decision="APPROVED",
-            db_session=test_db_session,
-            redis_client=test_redis,
-        )
-        assert validated is True
+            # validate_and_record after approval (now with explicit snapshot_id per bugfix)
+            validated = test_gate.validate_and_record(
+                token_id=token.token_id,
+                decision="APPROVED",
+                snapshot_id="snapshot-123",
+                db_session=test_db_session,
+                redis_client=test_redis,
+            )
+            assert validated is True
 
 
 @pytest.mark.asyncio
@@ -124,14 +126,22 @@ def test_replay_attack(test_db_session, test_redis):
 
     # First validation succeeds
     validated1 = ApprovalGate(redis_client=test_redis, db_session=test_db_session, secret_key="test-secret").validate_and_record(
-        token_id=token.token_id, decision="APPROVED", db_session=test_db_session, redis_client=test_redis
+        token_id=token.token_id,
+        decision="APPROVED",
+        snapshot_id=token.snapshot_id,
+        db_session=test_db_session,
+        redis_client=test_redis,
     )
     assert validated1 is True
 
     # Second (replay) fails (decision already set or expiry/HMAC state)
     test_redis.set(f"approval:{token.snapshot_id}:decision", "APPROVED")  # simulate consumed
     validated2 = ApprovalGate(redis_client=test_redis, db_session=test_db_session, secret_key="test-secret").validate_and_record(
-        token_id=token.token_id, decision="APPROVED", db_session=test_db_session, redis_client=test_redis
+        token_id=token.token_id,
+        decision="APPROVED",
+        snapshot_id=token.snapshot_id,
+        db_session=test_db_session,
+        redis_client=test_redis,
     )
     assert validated2 is False  # or would raise 409 in webhook
 

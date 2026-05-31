@@ -24,18 +24,22 @@ services:
       sh -c "uvicorn app.main_fastapi:app --host 0.0.0.0 --port 8000 & 
              celery -A celery_app worker --loglevel=info"
 
-  # Optional: Postgres for SQLAlchemy models
-  # db:
-  #   image: postgres:15
-  #   environment:
-  #     POSTGRES_DB: trust_runtime
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: trust_runtime
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   redis_data:
-  # postgres_data:
+  postgres_data:
