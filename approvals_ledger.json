@@ -132,5 +132,57 @@
       "Execution"
     ],
     "event_id": "stable-event-0"
+  },
+  {
+    "event_type": "checkpoint",
+    "approved_state": {
+      "service": "salesforce",
+      "method": "query",
+      "args": "()",
+      "kwargs": "{'threshold': 0.15}"
+    },
+    "live_state": {
+      "service": "salesforce",
+      "method": "query",
+      "args": "()",
+      "kwargs": "{'threshold': 0.15}"
+    },
+    "merkle_hash": "3ecbccde48e042aeee263bea10bae5f1f76e369857a5cc8cf369207208a20b38",
+    "trust_score": 0.9025,
+    "verdict": "ALLOW",
+    "reason": "Drift=0.05, anomalies=0, mode=WITH",
+    "agent_identity": "salesforce",
+    "pipeline_trace": [
+      "Retrieval (LangGraph multi-hop)",
+      "Memory/Reflection (gbrain)",
+      "Research",
+      "Decision (Hermes)",
+      "Approval (Vault)",
+      "Execution"
+    ],
+    "event_id": "stable-event-0"
+  },
+  {
+    "event_type": "checkpoint",
+    "approved_state": {
+      "approved": true
+    },
+    "live_state": {
+      "approved": true
+    },
+    "merkle_hash": "1dd2354984b8cc074c15f2efd60576297e706b894ee93a2fedf90915a2c9aaba",
+    "trust_score": 0.9025,
+    "verdict": "ALLOW",
+    "reason": "Drift=0.05, anomalies=0, mode=WITH",
+    "agent_identity": "test_agent",
+    "pipeline_trace": [
+      "Retrieval (LangGraph multi-hop)",
+      "Memory/Reflection (gbrain)",
+      "Research",
+      "Decision (Hermes)",
+      "Approval (Vault)",
+      "Execution"
+    ],
+    "event_id": "stable-event-0"
   }
 ]

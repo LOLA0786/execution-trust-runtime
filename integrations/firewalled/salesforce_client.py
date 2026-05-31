@@ -6,6 +6,7 @@ Compatible with simple-salesforce patterns but uses direct REST for minimal deps
 """
 import os
 import requests
+from __future__ import annotations
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging
@@ -22,7 +23,7 @@ class FirewalledSalesforceClient:
         if not self._connected:
             logger.warning("Salesforce not connected (missing SALESFORCE_INSTANCE_URL or ACCESS_TOKEN). Using mock mode for demo.")
 
-    def query(self, soql: str = None, threshold: float = 0.15) -> List[OpportunityRecord]:
+    def query(self, soql: str = None, threshold: float = 0.15) -> List["OpportunityRecord"]:
         """Execute SOQL query or return structured OpportunityRecord list.
         Supports both direct SOQL (real) and threshold param (for firewalled proxy compatibility).
         Returns mock with 70% discount for live_demo anomaly detection.
@@ -132,8 +133,7 @@ class OpportunityRecord(BaseModel):
     probability: Optional[float] = Field(None, alias='Probability')
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}
 
 
 # Singleton (injected into FirewalledProxy("salesforce", real_client=salesforce_client))

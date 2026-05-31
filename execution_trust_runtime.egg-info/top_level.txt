@@ -1,1 +1,7 @@
-execution_trust_runtime
+agents
+app
+core
+integrations
+services
+shared
+tests

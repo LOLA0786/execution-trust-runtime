@@ -14,15 +14,15 @@ from pydantic import BaseModel
 
 try:
     import chromadb
-    from chromadb.config import Settings
     CHROMA_AVAILABLE = True
-    # Disable telemetry and use persistent cache to avoid repeated model downloads
+    # Disable telemetry to prevent Rust/crash issues on some setups
     import os
     os.environ["CHROMA_TELEMETRY"] = "false"
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 except ImportError:
     CHROMA_AVAILABLE = False
+    chromadb = None
 
 
 class MemoryEntry(BaseModel):
@@ -49,9 +49,14 @@ class VectorMemory:
             self._init_chroma()
     
     def _init_chroma(self):
-        """Initialize persistent ChromaDB collection."""
-        self.client = chromadb.PersistentClient(path=self.persist_dir)
-        self.collection = self.client.get_or_create_collection(name=self.collection_name)
+        """Initialize persistent ChromaDB collection (with fallback for Rust issues)."""
+        try:
+            self.client = chromadb.PersistentClient(path=self.persist_dir)
+            self.collection = self.client.get_or_create_collection(name=self.collection_name)
+        except Exception as e:
+            print(f"Chroma init warning (using in-memory fallback): {e}")
+            self.collection = None
+            CHROMA_AVAILABLE = False
     
     def store(self, content: str, metadata: Dict[str, Any] = None) -> str:
         """Store memory with auto-generated ID and timestamp."""

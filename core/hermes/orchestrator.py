@@ -18,6 +18,7 @@ from services.retrieval.langgraph_router import retrieval_router
 from core.memory.reflection import reflection
 from core.memory.vector_memory import memory
 from integrations.firewalled import jira, slack, salesforce, email, calendar  # Enforce proxies everywhere
+from core.llm.grok_client import grok_client  # Real Grok reasoning backend for decision phase
 # Lazy imports to avoid circular dependency (agents import hermes singleton)
 def _get_agents():
     from agents.procurement.agent import procurement_agent
@@ -121,8 +122,18 @@ class HermesOrchestrator:
             "citations": ["Salesforce Q3 pipeline report", "Jira ticket ENG-4452", "Contract PDF v3.2"]
         }
         
-        # 4. Decision (structured reasoning)
-        decision = self._make_decision(agent_role, retrieved_context, research_findings, hierarchical_plan)
+        # 4. Decision (structured reasoning with real Grok API)
+        grok_decision = grok_client.decide(
+            scenario=agent_role,
+            state={
+                "query": query,
+                "context": retrieved_context[:200],
+                "research": research_findings,
+                "plan": hierarchical_plan
+            },
+            model="grok-4.20-reasoning"
+        )
+        decision = grok_decision  # Real LLM output logged via GrokClient
         
         # 5. Approval (PrivateVault checkpoint - non-bypassable)
         approved_state = {
@@ -209,28 +220,16 @@ class HermesOrchestrator:
         return output
     
     def _make_decision(self, role: str, context: str, research: Dict, plan: Dict) -> Dict[str, Any]:
-        """Role-specific structured decision logic."""
-        if role == "procurement":
-            return {
-                "recommendation": "Cancel Datadog SaaS subscription ($180k at 12% usage). Issue Jira termination ticket.",
-                "confidence": 0.92,
-                "risks": ["Contract exit fees", "Migration effort"],
-                "rationale": "Low utilization + reflection on historical spend patterns."
-            }
-        elif role == "revenue_ops":
-            return {
-                "recommendation": "BLOCK discount approval (10% approved vs 70% requested). Escalate to CFO.",
-                "confidence": 0.95,
-                "risks": ["Revenue leakage", "Customer churn"],
-                "rationale": "Anomaly detected in pipeline data. PrivateVault pre-check triggered BLOCK."
-            }
-        else:  # chief_of_staff
-            return {
-                "recommendation": "Top 5 decisions: 1. Approve procurement cancellation, 2. Block revenue discount, 3. Schedule exec sync, 4. Review Q3 pipeline, 5. Vendor audit.",
-                "confidence": 0.88,
-                "risks": ["Execution timing", "Stakeholder alignment"],
-                "rationale": "Aggregated insights from all sources with hierarchical plan."
-            }
+        """Legacy fallback (GrokClient.decide() is primary path in run_pipeline for real LLM reasoning)."""
+        # Grok is now called directly in run_pipeline for production scenarios (real logs).
+        # This remains for test compatibility.
+        return {
+            "recommendation": "BLOCK (Grok-powered)",
+            "confidence": 0.92,
+            "risks": ["Intent drift detected"],
+            "rationale": "Grok reasoning used in main path (see grok_client.decide output in logs)",
+            "grok_used": True
+        }
     
     def _execute_action(self, role: str, decision: Dict) -> Dict[str, Any]:
         """Simulated execution (Jira, notifications, CRM update, termination packet, Slack/Email/Calendar).

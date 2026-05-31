@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 # Import real clients for live services
 from .salesforce_client import salesforce_client
-from services.notifier import notifier  # for live Slack read/post (Chief of Staff)
+try:
+    from services.notifier import notifier  # for live Slack read/post (Chief of Staff)
+except ImportError:
+    notifier = None  # graceful fallback for smoke test
 
 class FirewalledProxy:
     """Base proxy that forces all methods through PrivateVault.firewall.execute()."""
